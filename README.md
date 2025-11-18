@@ -1,39 +1,78 @@
-<!--
-This README describes the package. If you publish this package to pub.dev,
-this README's contents appear on the landing page for your package.
+# Smart Data Table
 
-For information about how to write a good package README, see the guide for
-[writing package pages](https://dart.dev/tools/pub/writing-package-pages).
+A flexible, responsive Flutter data table widget built on top of `PaginatedDataTable`.
 
-For general information about developing packages, see the Dart guide for
-[creating packages](https://dart.dev/guides/libraries/create-packages)
-and the Flutter guide for
-[developing packages and plugins](https://flutter.dev/to/develop-packages).
--->
+This widget supports:
+- Sorting on any column
+- Text, number range, and date filtering
+- CSV export (clipboard and file)
+- Customizable row density (Compact / Comfy / Spacious)
+- Keyboard navigation (Up/Down/Page Up/Down/Enter)
+- Responsive layout (handles horizontal overflow gracefully)
 
-TODO: Put a short description of the package here that helps potential users
-know whether this package might be useful for them.
+Perfect for internal tools, admin dashboards, or desktop applications.
+
+---
 
 ## Features
 
-TODO: List what your package can do. Maybe include images, gifs, or videos.
+- Text and range-based filtering
+- Sortable columns with type-safe `sortBy`
+- CSV export (clipboard or download)
+- Keyboard navigation
+- Smart width handling for desktop/tablet devices
+- Fully generic over your data model
 
-## Getting started
-
-TODO: List prerequisites and provide or point to information on how to
-start using the package.
+---
 
 ## Usage
 
-TODO: Include short and useful examples for package users. Add longer examples
-to `/example` folder.
-
 ```dart
-const like = 'sample';
+import 'package:smart_data_table/smart_data_table.dart';
+
+SmartDataTable<Task>(
+  data: tasks,
+  columns: [
+    SmartColumn(
+      label: 'Title',
+      cellBuilder: (t) => Text(t.name),
+      filterKind: SmartFilterKind.text,
+      filterText: (t) => t.name,
+    ),
+    SmartColumn(
+      label: 'Priority',
+      cellBuilder: (t) => Text('${t.priority}'),
+      sortable: true,
+      sortBy: (t) => t.priority,
+      filterKind: SmartFilterKind.numberRange,
+      filterNumber: (t) => t.priority,
+    ),
+  ],
+  rowsPerPage: 10,
+  showFilters: true,
+  showToolbar: true,
+  onRowTap: (task) => print(task),
+);
 ```
 
-## Additional information
+## Getting Started
 
-TODO: Tell users more about the package: where to find more information, how to
-contribute to the package, how to file issues, what response they can expect
-from the package authors, and more.
+1. Clone the repo
+```bash
+git clone https://github.com/Tembocs/smart_data_table.git
+```
+
+2. Add a path dependency in pubspec.yaml:
+```bash
+dependencies:
+  smart_data_table:
+    path: ../smart_data_table
+```
+
+
+## Roadmap
+
+Tests for filtering/sorting
+Column resizing
+Select-all and batch action?
+Support sticky headers on large data
