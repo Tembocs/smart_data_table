@@ -57,13 +57,35 @@ SmartDataTable<Task>(
 
 ## Getting Started
 
+### Using from GitHub (recommended for now)
+
+Add this to your `pubspec.yaml`:
+
+```yaml
+dependencies:
+  smart_data_table:
+    git:
+      url: https://github.com/Tembocs/smart_data_table.git
+      ref: main  # or a specific tag/commit
+```
+
+Then run:
+
+```bash
+flutter pub get
+```
+
+### Using a local path (for contributing)
+
 1. Clone the repo
+
 ```bash
 git clone https://github.com/Tembocs/smart_data_table.git
 ```
 
-2. Add a path dependency in pubspec.yaml:
-```bash
+2. Point a path dependency in `pubspec.yaml` at your local checkout:
+
+```yaml
 dependencies:
   smart_data_table:
     path: ../smart_data_table
@@ -72,7 +94,7 @@ dependencies:
 
 ## Roadmap
 
-Tests for filtering/sorting
-Column resizing
-Select-all and batch action?
-Support sticky headers on large data
+- [ ] Tests for filtering/sorting
+- [ ] Column resizing
+- [ ] Select-all and batch action?
+- [ ] Support sticky headers on large data
