@@ -113,6 +113,9 @@ class _SmartDataTableState<T> extends State<SmartDataTable<T>> {
   /// Current row density used to compute row heights.
   late SmartRowDensity _rowDensity;
 
+  /// Column widths (one per column), dynamically resizable.
+  late List<double> _columnWidths;
+
   // Filtering state (as controllers; we store raw text here, then interpret
   // it when recomputing the view).
   late final List<TextEditingController?> _textFilters;
@@ -126,6 +129,12 @@ class _SmartDataTableState<T> extends State<SmartDataTable<T>> {
     super.initState();
     _viewData = List<T>.from(widget.data);
     _rowDensity = widget.rowDensity;
+
+    // Initialize column widths to minColWidth for each column.
+    _columnWidths = List<double>.filled(
+      widget.columns.length,
+      widget.minColWidth,
+    );
 
     // Initialize text controllers only for columns that support that filter type.
     _textFilters = [
@@ -489,6 +498,82 @@ class _SmartDataTableState<T> extends State<SmartDataTable<T>> {
     }
   }
 
+  /// Builds a resizable column header with drag handle on the right edge.
+  Widget _buildResizableHeader(int colIndex) {
+    final col = widget.columns[colIndex];
+    final isSorted = _sortColumnIndex == colIndex;
+
+    return SizedBox(
+      width: _columnWidths[colIndex],
+      child: Stack(
+        children: [
+          // Column header content
+          Positioned.fill(
+            child: Padding(
+              padding: const EdgeInsets.only(left: 8.0, right: 16.0),
+              child: Align(
+                alignment: col.numeric
+                    ? Alignment.centerRight
+                    : Alignment.centerLeft,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Flexible(
+                      child: Text(
+                        col.label,
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
+                      ),
+                    ),
+                    if (isSorted) ...[
+                      const SizedBox(width: 4),
+                      Icon(
+                        _ascending ? Icons.arrow_upward : Icons.arrow_downward,
+                        size: 16,
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          ),
+          // Resize handle on the right edge
+          Positioned(
+            right: 0,
+            top: 0,
+            bottom: 0,
+            child: MouseRegion(
+              cursor: SystemMouseCursors.resizeColumn,
+              child: GestureDetector(
+                onHorizontalDragUpdate: (details) {
+                  setState(() {
+                    // Update column width, enforce minimum of 50px
+                    _columnWidths[colIndex] =
+                        (_columnWidths[colIndex] + details.delta.dx).clamp(
+                          50.0,
+                          double.infinity,
+                        );
+                  });
+                },
+                child: Container(
+                  width: 8,
+                  color: Colors.transparent,
+                  child: Center(
+                    child: Container(
+                      width: 1,
+                      color: Colors.grey.withOpacity(0.3),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   /// Builds the horizontal row of filter controls based on [SmartFilterKind]
   /// for each column.
   Widget _buildFilters() {
@@ -501,7 +586,7 @@ class _SmartDataTableState<T> extends State<SmartDataTable<T>> {
         case SmartFilterKind.text:
           children.add(
             SizedBox(
-              width: widget.minColWidth,
+              width: _columnWidths[i],
               child: TextField(
                 controller: _textFilters[i],
                 decoration: InputDecoration(
@@ -518,7 +603,7 @@ class _SmartDataTableState<T> extends State<SmartDataTable<T>> {
         case SmartFilterKind.numberRange:
           children.add(
             SizedBox(
-              width: widget.minColWidth,
+              width: _columnWidths[i],
               child: Row(
                 children: [
                   Expanded(
@@ -553,7 +638,7 @@ class _SmartDataTableState<T> extends State<SmartDataTable<T>> {
         case SmartFilterKind.dateRange:
           children.add(
             SizedBox(
-              width: widget.minColWidth,
+              width: _columnWidths[i],
               child: Row(
                 children: [
                   Expanded(
@@ -600,29 +685,29 @@ class _SmartDataTableState<T> extends State<SmartDataTable<T>> {
 
   @override
   Widget build(BuildContext context) {
-    final minTableWidth = widget.columns.length * widget.minColWidth;
+    final totalColumnWidth = _columnWidths.reduce((a, b) => a + b);
 
     // Main table widget wrapped in LayoutBuilder to derive finite width.
     final table = LayoutBuilder(
       builder: (context, constraints) {
-        final viewport =
-            constraints.maxWidth.isFinite && constraints.maxWidth > 0
-            ? constraints.maxWidth
-            : minTableWidth;
-        final tableWidth = viewport < minTableWidth ? minTableWidth : viewport;
-
         final tableWidget = SingleChildScrollView(
           primary: false,
           child: SingleChildScrollView(
             primary: false,
             scrollDirection: Axis.horizontal,
             child: SizedBox(
-              width: tableWidth,
+              width: totalColumnWidth,
               child: PaginatedDataTable(
                 columns: [
                   for (int i = 0; i < widget.columns.length; i++)
                     DataColumn(
-                      label: Text(widget.columns[i].label),
+                      label: ConstrainedBox(
+                        constraints: BoxConstraints(
+                          minWidth: _columnWidths[i],
+                          maxWidth: _columnWidths[i],
+                        ),
+                        child: _buildResizableHeader(i),
+                      ),
                       numeric: widget.columns[i].numeric,
                       onSort: widget.columns[i].sortable
                           ? (index, asc) {
@@ -642,6 +727,7 @@ class _SmartDataTableState<T> extends State<SmartDataTable<T>> {
                   selectedRowIndices: _selectedIndices,
                   onSetSelectedIndices: (next) =>
                       setState(() => _selectedIndices = next),
+                  columnWidths: _columnWidths,
                 ),
                 onSelectAll: (selected) {
                   setState(() {
@@ -659,7 +745,8 @@ class _SmartDataTableState<T> extends State<SmartDataTable<T>> {
                 rowsPerPage: widget.rowsPerPage,
                 sortColumnIndex: _sortColumnIndex,
                 sortAscending: _ascending,
-                columnSpacing: 12,
+                columnSpacing: 0,
+                horizontalMargin: 0,
                 dataRowMinHeight: _dataRowHeight,
                 dataRowMaxHeight: _dataRowHeight,
                 headingRowHeight: _headingRowHeight,

@@ -10,11 +10,14 @@ class SmartTableSource<T> extends DataTableSource {
     this._onTap, {
     required Set<int> selectedRowIndices,
     required this.onSetSelectedIndices,
-  }) : _selectedRowIndices = selectedRowIndices;
+    required List<double> columnWidths,
+  }) : _selectedRowIndices = selectedRowIndices,
+       _columnWidths = columnWidths;
 
   final List<T> _data;
   final List<SmartColumn<T>> _columns;
   final void Function(T)? _onTap;
+  final List<double> _columnWidths;
 
   /// Called when the set of selected indices changes.
   final void Function(Set<int> indices) onSetSelectedIndices;
@@ -42,9 +45,19 @@ class SmartTableSource<T> extends DataTableSource {
         onSetSelectedIndices(next);
       },
       cells: [
-        for (final col in _columns)
+        for (int i = 0; i < _columns.length; i++)
           DataCell(
-            col.cellBuilder(item),
+            Container(
+              constraints: BoxConstraints(
+                minWidth: _columnWidths[i],
+                maxWidth: _columnWidths[i],
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 8.0),
+              alignment: _columns[i].numeric
+                  ? Alignment.centerRight
+                  : Alignment.centerLeft,
+              child: _columns[i].cellBuilder(item),
+            ),
             // Row content click: navigate if selected, otherwise select.
             onTap: () {
               if (isSelected && _onTap != null) {
