@@ -1,4 +1,4 @@
-library smart_data_table;
+// library smart_data_table;
 
 export 'src/smart_data_table_core.dart';
 export 'src/column.dart';
