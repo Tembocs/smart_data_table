@@ -107,8 +107,8 @@ class _SmartDataTableState<T> extends State<SmartDataTable<T>> {
   /// Current view after applying filters and sorting.
   late List<T> _viewData;
 
-  /// Currently selected row index in the full view (not just within a page).
-  int? _selectedIndex;
+  /// Currently selected row indices in the full view (not just within a page).
+  Set<int> _selectedIndices = <int>{};
 
   /// Current row density used to compute row heights.
   late SmartRowDensity _rowDensity;
@@ -269,6 +269,9 @@ class _SmartDataTableState<T> extends State<SmartDataTable<T>> {
     if (widget.columns[_sortColumnIndex].sortable) {
       _doSort(_sortColumnIndex, _ascending);
     }
+
+    // Reset selection when data/view changes to avoid stale indices.
+    _selectedIndices = <int>{};
 
     setState(() {});
   }
@@ -636,9 +639,23 @@ class _SmartDataTableState<T> extends State<SmartDataTable<T>> {
                   _viewData,
                   widget.columns,
                   widget.onRowTap,
-                  selectedRowIndex: _selectedIndex,
-                  onSelectRow: (idx) => setState(() => _selectedIndex = idx),
+                  selectedRowIndices: _selectedIndices,
+                  onSetSelectedIndices: (next) =>
+                      setState(() => _selectedIndices = next),
                 ),
+                onSelectAll: (selected) {
+                  setState(() {
+                    if (selected == true) {
+                      // Select all rows in the current view.
+                      _selectedIndices = Set<int>.from(
+                        List.generate(_viewData.length, (i) => i),
+                      );
+                    } else {
+                      // Deselect all rows.
+                      _selectedIndices = <int>{};
+                    }
+                  });
+                },
                 rowsPerPage: widget.rowsPerPage,
                 sortColumnIndex: _sortColumnIndex,
                 sortAscending: _ascending,
@@ -700,7 +717,9 @@ class _SmartDataTableState<T> extends State<SmartDataTable<T>> {
                       0,
                       _viewData.length - 1,
                     );
-                    int idx = _selectedIndex ?? 0;
+                    int idx = _selectedIndices.isEmpty
+                        ? 0
+                        : _selectedIndices.first;
                     if (intent.direction == TraversalDirection.down) {
                       idx = (idx + 1).clamp(0, maxIndex);
                     } else if (intent.direction == TraversalDirection.up) {
@@ -709,7 +728,7 @@ class _SmartDataTableState<T> extends State<SmartDataTable<T>> {
                     // keep within current page bounds
                     final pageStart = ((idx ~/ rowsPerPage) * rowsPerPage);
                     final inPageIdx = idx - pageStart;
-                    _selectedIndex = pageStart + inPageIdx;
+                    _selectedIndices = {pageStart + inPageIdx};
                   });
                   return null;
                 },
@@ -722,7 +741,9 @@ class _SmartDataTableState<T> extends State<SmartDataTable<T>> {
                       0,
                       _viewData.length - 1,
                     );
-                    int idx = _selectedIndex ?? 0;
+                    int idx = _selectedIndices.isEmpty
+                        ? 0
+                        : _selectedIndices.first;
                     if (intent.direction == AxisDirection.down) {
                       idx = (idx + rowsPerPage).clamp(0, maxIndex);
                     } else if (intent.direction == AxisDirection.up) {
@@ -730,15 +751,16 @@ class _SmartDataTableState<T> extends State<SmartDataTable<T>> {
                     }
                     // clamp to start of the current page
                     final pageStart = ((idx ~/ rowsPerPage) * rowsPerPage);
-                    _selectedIndex = pageStart; // top of page
+                    _selectedIndices = {pageStart}; // top of page
                   });
                   return null;
                 },
               ),
               ActivateIntent: CallbackAction<ActivateIntent>(
                 onInvoke: (_) {
-                  final idx = _selectedIndex;
-                  if (idx != null && idx >= 0 && idx < _viewData.length) {
+                  if (_selectedIndices.isEmpty) return null;
+                  final idx = _selectedIndices.first;
+                  if (idx >= 0 && idx < _viewData.length) {
                     final item = _viewData[idx];
                     widget.onRowTap?.call(item);
                   }

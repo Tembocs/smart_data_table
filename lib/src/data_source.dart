@@ -8,38 +8,38 @@ class SmartTableSource<T> extends DataTableSource {
     this._data,
     this._columns,
     this._onTap, {
-    int? selectedRowIndex,
-    this.onSelectRow,
-  }) : _selectedRowIndex = selectedRowIndex;
+    required Set<int> selectedRowIndices,
+    required this.onSetSelectedIndices,
+  }) : _selectedRowIndices = selectedRowIndices;
 
   final List<T> _data;
   final List<SmartColumn<T>> _columns;
   final void Function(T)? _onTap;
 
-  /// Called when selection changes (index in current view or null to clear).
-  final void Function(int? index)? onSelectRow;
+  /// Called when the set of selected indices changes.
+  final void Function(Set<int> indices) onSetSelectedIndices;
 
-  /// Currently selected row index in the full view.
-  final int? _selectedRowIndex;
+  /// Currently selected row indices in the full view.
+  final Set<int> _selectedRowIndices;
 
   @override
   DataRow? getRow(int index) {
     if (index >= _data.length) return null;
     final item = _data[index];
-    final isSelected = _selectedRowIndex == index;
+    final isSelected = _selectedRowIndices.contains(index);
 
     return DataRow.byIndex(
       index: index,
       selected: isSelected,
       // Checkbox click: toggle selection (select/deselect).
       onSelectChanged: (_) {
+        final next = {..._selectedRowIndices};
         if (isSelected) {
-          // Deselect if already selected.
-          onSelectRow?.call(null);
+          next.remove(index);
         } else {
-          // Select if not selected.
-          onSelectRow?.call(index);
+          next.add(index);
         }
+        onSetSelectedIndices(next);
       },
       cells: [
         for (final col in _columns)
@@ -52,7 +52,8 @@ class SmartTableSource<T> extends DataTableSource {
                 _onTap(item);
               } else {
                 // Otherwise, select the row.
-                onSelectRow?.call(index);
+                final next = {..._selectedRowIndices}..add(index);
+                onSetSelectedIndices(next);
               }
             },
           ),
@@ -67,5 +68,5 @@ class SmartTableSource<T> extends DataTableSource {
   int get rowCount => _data.length;
 
   @override
-  int get selectedRowCount => 0;
+  int get selectedRowCount => _selectedRowIndices.length;
 }
