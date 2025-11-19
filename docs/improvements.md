@@ -11,11 +11,11 @@ This document outlines potential areas for improvement for the `smart_data_table
     - [x] Filter the `columns` list passed to the table based on the user's selection.
 
 ## 2. Enhanced Filter UI (Easy)
-- [ ] **Goal**: Replace generic text inputs with appropriate controls for specific data types.
+- [x] **Goal**: Replace generic text inputs with appropriate controls for specific data types.
 - **Why**: Typing dates (e.g., "2023-10-01") or exact status strings is error-prone and slow.
 - **Implementation**:
-    - [ ] **Date Range**: Use `showDatePicker` for date columns.
-    - [ ] **Enums/Categories**: Use a `DropdownButton` for columns with a limited set of known values.
+    - [x] **Date Range**: Use `showDatePicker` for date columns.
+    - [x] **Enums/Categories**: Use a `DropdownButton` for columns with a limited set of known values.
 
 ## 3. Batch Actions Toolbar (Easy)
 - [ ] **Goal**: Show action buttons when rows are selected.

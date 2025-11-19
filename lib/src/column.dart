@@ -13,7 +13,8 @@ enum SmartRowDensity { compact, comfy, spacious }
 /// - [text]        → a single text field, supports `contains(...)`.
 /// - [numberRange] → two numeric fields: Min / Max.
 /// - [dateRange]   → two date fields, expects `YYYY-MM-DD` input.
-enum SmartFilterKind { none, text, numberRange, dateRange }
+/// - [select]      → a dropdown menu for exact matching (e.g. enums).
+enum SmartFilterKind { none, text, numberRange, dateRange, select }
 
 /// Column configuration for [SmartDataTable].
 ///
@@ -35,6 +36,8 @@ class SmartColumn<T> {
     this.filterText,
     this.filterNumber,
     this.filterDate,
+    this.filterItems,
+    this.filterSelect,
   });
 
   /// Column header text.
@@ -78,4 +81,14 @@ class SmartColumn<T> {
   ///
   /// Only used when [filterKind] == [SmartFilterKind.dateRange].
   final DateTime Function(T)? filterDate;
+
+  /// List of options to display in the dropdown.
+  ///
+  /// Only used when [filterKind] == [SmartFilterKind.select].
+  final List<String>? filterItems;
+
+  /// Getter used for exact match filtering against the selected dropdown value.
+  ///
+  /// Only used when [filterKind] == [SmartFilterKind.select].
+  final String Function(T)? filterSelect;
 }

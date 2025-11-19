@@ -126,6 +126,7 @@ class _SmartDataTableState<T> extends State<SmartDataTable<T>> {
   late final List<TextEditingController?> _numberMaxFilters;
   late final List<TextEditingController?> _dateMinFilters;
   late final List<TextEditingController?> _dateMaxFilters;
+  late final List<String?> _selectFilters;
 
   @override
   void initState() {
@@ -171,6 +172,10 @@ class _SmartDataTableState<T> extends State<SmartDataTable<T>> {
         c.filterKind == SmartFilterKind.dateRange
             ? TextEditingController()
             : null,
+    ];
+    _selectFilters = [
+      for (final c in widget.columns)
+        c.filterKind == SmartFilterKind.select ? null : null,
     ];
   }
 
@@ -272,6 +277,14 @@ class _SmartDataTableState<T> extends State<SmartDataTable<T>> {
               if (maxD != null && v.isAfter(maxD)) return false;
               return true;
             }).toList();
+          }
+          break;
+
+        case SmartFilterKind.select:
+          final selected = _selectFilters[i];
+          final getter = col.filterSelect;
+          if (selected != null && getter != null) {
+            _viewData = _viewData.where((e) => getter(e) == selected).toList();
           }
           break;
 
@@ -493,6 +506,12 @@ class _SmartDataTableState<T> extends State<SmartDataTable<T>> {
         changed = true;
       }
     }
+    for (int i = 0; i < _selectFilters.length; i++) {
+      if (_selectFilters[i] != null) {
+        _selectFilters[i] = null;
+        changed = true;
+      }
+    }
 
     if (changed) {
       _recomputeView();
@@ -704,6 +723,22 @@ class _SmartDataTableState<T> extends State<SmartDataTable<T>> {
           break;
 
         case SmartFilterKind.dateRange:
+          Future<void> pickDate(TextEditingController controller) async {
+            final now = DateTime.now();
+            final picked = await showDatePicker(
+              context: context,
+              initialDate: now,
+              firstDate: DateTime(2000),
+              lastDate: DateTime(2100),
+            );
+            if (picked != null) {
+              final s =
+                  '${picked.year}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}';
+              controller.text = s;
+              _recomputeView();
+            }
+          }
+
           children.add(
             SizedBox(
               width: _columnWidths[i],
@@ -713,10 +748,12 @@ class _SmartDataTableState<T> extends State<SmartDataTable<T>> {
                     child: TextField(
                       controller: _dateMinFilters[i],
                       decoration: const InputDecoration(
-                        labelText: 'From (YYYY-MM-DD)',
+                        labelText: 'From',
                         isDense: true,
+                        suffixIcon: Icon(Icons.calendar_today, size: 16),
                       ),
-                      onChanged: (_) => _recomputeView(),
+                      readOnly: true,
+                      onTap: () => pickDate(_dateMinFilters[i]!),
                     ),
                   ),
                   const SizedBox(width: 6),
@@ -724,13 +761,47 @@ class _SmartDataTableState<T> extends State<SmartDataTable<T>> {
                     child: TextField(
                       controller: _dateMaxFilters[i],
                       decoration: const InputDecoration(
-                        labelText: 'To (YYYY-MM-DD)',
+                        labelText: 'To',
                         isDense: true,
+                        suffixIcon: Icon(Icons.calendar_today, size: 16),
                       ),
-                      onChanged: (_) => _recomputeView(),
+                      readOnly: true,
+                      onTap: () => pickDate(_dateMaxFilters[i]!),
                     ),
                   ),
                 ],
+              ),
+            ),
+          );
+          break;
+
+        case SmartFilterKind.select:
+          children.add(
+            SizedBox(
+              width: _columnWidths[i],
+              child: DropdownButtonFormField<String>(
+                value: _selectFilters[i],
+                decoration: InputDecoration(
+                  labelText: col.label,
+                  isDense: true,
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 12,
+                  ),
+                ),
+                isExpanded: true,
+                items: [
+                  const DropdownMenuItem(value: null, child: Text('All')),
+                  ...?col.filterItems?.map(
+                    (e) => DropdownMenuItem(value: e, child: Text(e)),
+                  ),
+                ],
+                onChanged: (v) {
+                  setState(() {
+                    _selectFilters[i] = v;
+                    _recomputeView();
+                  });
+                },
               ),
             ),
           );

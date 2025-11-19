@@ -236,4 +236,92 @@ void main() {
     // Verify "Title" column header is still there.
     expect(find.text('Title'), findsOneWidget);
   });
+
+  testWidgets('select filter filters rows', (tester) async {
+    final tasks = <_Task>[
+      _Task('Alpha', 1, DateTime(2024, 1, 10)),
+      _Task('Beta', 2, DateTime(2024, 2, 10)),
+    ];
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SmartDataTable<_Task>(
+            data: tasks,
+            columns: [
+              SmartColumn<_Task>(
+                label: 'Title',
+                cellBuilder: (t) => Text(t.name),
+                filterKind: SmartFilterKind.select,
+                filterItems: ['Alpha', 'Beta'],
+                filterSelect: (t) => t.name,
+              ),
+            ],
+            rowsPerPage: 10,
+            showFilters: true,
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('Alpha'), findsOneWidget);
+    expect(find.text('Beta'), findsOneWidget);
+
+    // Find dropdown
+    final dropdown = find.byType(DropdownButtonFormField<String>);
+    expect(dropdown, findsOneWidget);
+
+    // Open dropdown
+    await tester.tap(dropdown);
+    await tester.pumpAndSettle();
+
+    // Select 'Alpha'
+    // Note: 'Alpha' text appears in the table row and in the dropdown menu item.
+    // We want the one in the dropdown menu.
+    await tester.tap(find.text('Alpha').last);
+    await tester.pumpAndSettle();
+
+    // One 'Alpha' in the dropdown (selected value), one in the table row.
+    expect(find.text('Alpha'), findsNWidgets(2));
+    expect(find.text('Beta'), findsNothing);
+  });
+
+  testWidgets('date filter opens date picker', (tester) async {
+    final tasks = <_Task>[_Task('Alpha', 1, DateTime(2024, 1, 10))];
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SmartDataTable<_Task>(
+            data: tasks,
+            columns: [
+              SmartColumn<_Task>(
+                label: 'Date',
+                cellBuilder: (t) => Text(t.createdAt.toString()),
+                filterKind: SmartFilterKind.dateRange,
+                filterDate: (t) => t.createdAt,
+              ),
+            ],
+            rowsPerPage: 10,
+            showFilters: true,
+          ),
+        ),
+      ),
+    );
+
+    // Find date fields
+    final dateFields = find.byType(TextField);
+    expect(dateFields, findsNWidgets(2));
+
+    // Tap the first one (From)
+    await tester.tap(dateFields.first);
+    await tester.pumpAndSettle();
+
+    // Check for date picker dialog
+    expect(find.byType(DatePickerDialog), findsOneWidget);
+
+    // Close dialog to avoid leaking state
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+  });
 }
