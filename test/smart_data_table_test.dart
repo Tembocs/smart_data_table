@@ -183,4 +183,57 @@ void main() {
     expect(find.text('Beta'), findsOneWidget);
     expect(find.text('Gamma'), findsOneWidget);
   });
+
+  testWidgets('toggles column visibility via toolbar', (tester) async {
+    final tasks = <_Task>[_Task('Alpha', 1, DateTime(2024, 1, 10))];
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SmartDataTable<_Task>(
+            data: tasks,
+            columns: [
+              SmartColumn<_Task>(
+                label: 'Title',
+                cellBuilder: (t) => Text(t.name),
+              ),
+              SmartColumn<_Task>(
+                label: 'Priority',
+                cellBuilder: (t) => Text('${t.priority}'),
+              ),
+            ],
+            rowsPerPage: 10,
+            showToolbar: true,
+          ),
+        ),
+      ),
+    );
+
+    // Initially both columns are visible.
+    expect(find.text('Title'), findsOneWidget);
+    expect(find.text('Priority'), findsOneWidget);
+
+    // Tap the "Columns" button in the toolbar.
+    await tester.tap(find.text('Columns'));
+    await tester.pumpAndSettle();
+
+    // Verify dialog appears with checkboxes.
+    expect(find.text('Select Columns'), findsOneWidget);
+    expect(find.text('Title'), findsNWidgets(2)); // Header + Checkbox
+    expect(find.text('Priority'), findsNWidgets(2)); // Header + Checkbox
+
+    // Uncheck "Priority" column.
+    // Find the checkbox tile for Priority.
+    await tester.tap(find.widgetWithText(CheckboxListTile, 'Priority'));
+    await tester.pumpAndSettle();
+
+    // Close the dialog.
+    await tester.tap(find.text('Close'));
+    await tester.pumpAndSettle();
+
+    // Verify "Priority" column header is gone.
+    expect(find.text('Priority'), findsNothing);
+    // Verify "Title" column header is still there.
+    expect(find.text('Title'), findsOneWidget);
+  });
 }

@@ -110,6 +110,9 @@ class _SmartDataTableState<T> extends State<SmartDataTable<T>> {
   /// Currently selected row indices in the full view (not just within a page).
   Set<int> _selectedIndices = <int>{};
 
+  /// Indices of columns that are currently visible.
+  late Set<int> _visibleIndices;
+
   /// Current row density used to compute row heights.
   late SmartRowDensity _rowDensity;
 
@@ -134,6 +137,10 @@ class _SmartDataTableState<T> extends State<SmartDataTable<T>> {
     _columnWidths = List<double>.filled(
       widget.columns.length,
       widget.minColWidth,
+    );
+
+    _visibleIndices = Set<int>.from(
+      List.generate(widget.columns.length, (i) => i),
     );
 
     // Initialize text controllers only for columns that support that filter type.
@@ -320,6 +327,49 @@ class _SmartDataTableState<T> extends State<SmartDataTable<T>> {
     SmartRowDensity.spacious => 60,
   };
 
+  void _showColumnSelector() {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setStateDialog) {
+            return AlertDialog(
+              title: const Text('Select Columns'),
+              content: SingleChildScrollView(
+                child: ListBody(
+                  children: widget.columns.asMap().entries.map((entry) {
+                    final index = entry.key;
+                    final col = entry.value;
+                    return CheckboxListTile(
+                      value: _visibleIndices.contains(index),
+                      title: Text(col.label),
+                      onChanged: (bool? value) {
+                        setStateDialog(() {
+                          if (value == true) {
+                            _visibleIndices.add(index);
+                          } else {
+                            _visibleIndices.remove(index);
+                          }
+                        });
+                        this.setState(() {});
+                      },
+                    );
+                  }).toList(),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  child: const Text('Close'),
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
   /// Optional toolbar with:
   /// - Export CSV (clipboard)
   /// - Save CSV to file (Downloads / temp)
@@ -329,10 +379,15 @@ class _SmartDataTableState<T> extends State<SmartDataTable<T>> {
     if (!widget.showToolbar) return const SizedBox.shrink();
     return Padding(
       padding: const EdgeInsets.only(bottom: 8.0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      child: Wrap(
+        alignment: WrapAlignment.spaceBetween,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        spacing: 8.0,
+        runSpacing: 8.0,
         children: [
-          Row(
+          Wrap(
+            spacing: 8.0,
+            runSpacing: 8.0,
             children: [
               Tooltip(
                 message: 'Export visible rows to CSV (copied to clipboard)',
@@ -342,7 +397,6 @@ class _SmartDataTableState<T> extends State<SmartDataTable<T>> {
                   onPressed: _exportCsv,
                 ),
               ),
-              const SizedBox(width: 8),
               Tooltip(
                 message: 'Save visible rows to CSV file (Downloads folder)',
                 child: OutlinedButton.icon(
@@ -351,7 +405,6 @@ class _SmartDataTableState<T> extends State<SmartDataTable<T>> {
                   onPressed: _saveCsv,
                 ),
               ),
-              const SizedBox(width: 8),
               Tooltip(
                 message: 'Clear all active filters',
                 child: OutlinedButton.icon(
@@ -360,9 +413,18 @@ class _SmartDataTableState<T> extends State<SmartDataTable<T>> {
                   onPressed: _clearFilters,
                 ),
               ),
+              Tooltip(
+                message: 'Select columns to display',
+                child: OutlinedButton.icon(
+                  icon: const Icon(Icons.view_column),
+                  label: const Text('Columns'),
+                  onPressed: _showColumnSelector,
+                ),
+              ),
             ],
           ),
           Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
               const Text('Density:'),
               const SizedBox(width: 8),
@@ -442,14 +504,19 @@ class _SmartDataTableState<T> extends State<SmartDataTable<T>> {
   /// - First row: headers (column labels).
   /// - Subsequent rows: values from [SmartColumn.csvValue] or [SmartColumn.sortBy].
   String _buildCsvString() {
-    final headers = widget.columns.map((c) => c.label).toList();
+    final visibleIndicesList = _visibleIndices.toList()..sort();
+    final headers = visibleIndicesList
+        .map((i) => widget.columns[i].label)
+        .toList();
     final rows = <List<String>>[];
 
     for (final item in _viewData) {
       rows.add([
-        for (final c in widget.columns)
-          c.csvValue?.call(item) ??
-              (c.sortBy != null ? '${c.sortBy!(item)}' : ''),
+        for (final i in visibleIndicesList)
+          widget.columns[i].csvValue?.call(item) ??
+              (widget.columns[i].sortBy != null
+                  ? '${widget.columns[i].sortBy!(item)}'
+                  : ''),
       ]);
     }
 
@@ -579,8 +646,9 @@ class _SmartDataTableState<T> extends State<SmartDataTable<T>> {
   Widget _buildFilters() {
     if (!widget.showFilters) return const SizedBox.shrink();
     final children = <Widget>[];
+    final visibleIndicesList = _visibleIndices.toList()..sort();
 
-    for (int i = 0; i < widget.columns.length; i++) {
+    for (final i in visibleIndicesList) {
       final col = widget.columns[i];
       switch (col.filterKind) {
         case SmartFilterKind.text:
@@ -685,7 +753,11 @@ class _SmartDataTableState<T> extends State<SmartDataTable<T>> {
 
   @override
   Widget build(BuildContext context) {
-    final totalColumnWidth = _columnWidths.reduce((a, b) => a + b);
+    final visibleIndicesList = _visibleIndices.toList()..sort();
+    final totalColumnWidth = visibleIndicesList.fold(
+      0.0,
+      (sum, i) => sum + _columnWidths[i],
+    );
 
     // Main table widget wrapped in LayoutBuilder to derive finite width.
     final table = LayoutBuilder(
@@ -699,7 +771,7 @@ class _SmartDataTableState<T> extends State<SmartDataTable<T>> {
               width: totalColumnWidth,
               child: PaginatedDataTable(
                 columns: [
-                  for (int i = 0; i < widget.columns.length; i++)
+                  for (final i in visibleIndicesList)
                     DataColumn(
                       label: ConstrainedBox(
                         constraints: BoxConstraints(
@@ -710,11 +782,11 @@ class _SmartDataTableState<T> extends State<SmartDataTable<T>> {
                       ),
                       numeric: widget.columns[i].numeric,
                       onSort: widget.columns[i].sortable
-                          ? (index, asc) {
+                          ? (_, asc) {
                               setState(() {
-                                _sortColumnIndex = index;
+                                _sortColumnIndex = i;
                                 _ascending = asc;
-                                _doSort(index, asc);
+                                _doSort(i, asc);
                               });
                             }
                           : null,
@@ -722,12 +794,14 @@ class _SmartDataTableState<T> extends State<SmartDataTable<T>> {
                 ],
                 source: SmartTableSource<T>(
                   _viewData,
-                  widget.columns,
+                  [for (final i in visibleIndicesList) widget.columns[i]],
                   widget.onRowTap,
                   selectedRowIndices: _selectedIndices,
                   onSetSelectedIndices: (next) =>
                       setState(() => _selectedIndices = next),
-                  columnWidths: _columnWidths,
+                  columnWidths: [
+                    for (final i in visibleIndicesList) _columnWidths[i],
+                  ],
                 ),
                 onSelectAll: (selected) {
                   setState(() {
@@ -743,7 +817,9 @@ class _SmartDataTableState<T> extends State<SmartDataTable<T>> {
                   });
                 },
                 rowsPerPage: widget.rowsPerPage,
-                sortColumnIndex: _sortColumnIndex,
+                sortColumnIndex: visibleIndicesList.contains(_sortColumnIndex)
+                    ? visibleIndicesList.indexOf(_sortColumnIndex)
+                    : null,
                 sortAscending: _ascending,
                 columnSpacing: 0,
                 horizontalMargin: 0,
